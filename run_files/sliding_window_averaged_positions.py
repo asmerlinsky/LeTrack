@@ -1,16 +1,18 @@
 import json
 import os
-
+import glob
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.signal as spsig
 from varname import nameof
+from Utils.opencvUtils import *
 
 if __name__ == '__main__':
     # TRACKING_COLOR = cv2.COLOR_BGR2GRAY
     TRACKING_COLOR = cv2.COLOR_BGR2HSV
 
+    filter_length = 5
     fps = 30
     save_fig = False
     show_plot = True
@@ -21,44 +23,67 @@ if __name__ == '__main__':
     data_path = "tracked_data/"
 
     with open('marker_dict.json', 'r') as fp:
-        marker_dict = json.load(fp)
+        video_params = json.load(fp)
 
-    for fn in list(marker_dict):
-        if not marker_dict[fn]['analyze']:
+    npy_files = glob.glob('tracked_data/21-04-26*.npy')
+    remove_files = glob.glob('tracked_data/21-04-26*_centered*.npy')
+    npy_files = [fn for fn in npy_files if fn not in remove_files]
+
+
+    file_list = [fn for fn in list(video_params) if '21-04-26' in fn]
+
+    # npy_files = [npy_files[4], npy_files[7]]
+    # lims = ((90, 107), (22, 37))
+    # n = 0
+    cnt = 0
+    for npy_file in npy_files[::3]:
+    # for npy_file in [npy_files[1]]:
+
+        basename = getBasenameFromNpy(npy_file)
+
+        if not video_params[basename + '.AVI']['analyze']:
+            print("Skipping %s, 'analize' is False" % basename)
             continue
-        basename = os.path.splitext(os.path.basename(fn))[0]
-        filename = data_path + basename + '.npy'
 
-        # os.system("vlc vids/%s_out.avi" % basename)
+        # filename = data_path + basename + '_centered.npy'
 
-        print("Running %s" % filename)
+        print("Running %s" % basename)
 
-        trace = np.load(filename)
+        trace = np.load(npy_file)
+        # trace = trace[-9:, 1530:]
 
         seg_len = np.sqrt(np.sum(np.power(np.diff(trace, axis=0), 2), axis=2))
         total_length = seg_len.sum(axis=0)
 
-        fig0, ax0 = plt.subplots()
-        ax0.plot(total_length)
-        fig0.canvas.draw()
-        fig0.suptitle(basename)
-        if save_fig: fig0.savefig("figs/" + basename + "_totlen.png", transparent=True, dpi=600)
+        # fig0, ax0 = plt.subplots()
+        # ax0.plot(total_length)
+        # fig0.canvas.draw()
+        # fig0.suptitle(basename)
+        # if save_fig: fig0.savefig("figs/" + basename + "_totlen.png", transparent=True, dpi=600)
 
         smoothed_seg_len = []
         speed = []
-        filter_length = 5
+
+
         time_array = np.arange(0, trace.shape[1] / fps, 1 / fps)
 
-        mins = spsig.find_peaks(-total_length, -800, distance=int(2 * fps))[0]
+        # mins = spsig.find_peaks(-total_length, np.mean(-total_length), distance=int(2 * fps))[0]
 
-        min_times = time_array[mins]
-        up_thres = .05
-        low_thres = -.05
+        # min_times = time_array[mins]
+        if cnt == 1:
+            up_thres = 3.
+            low_thres = -3.
+        else:
+            up_thres = 1.5
+            low_thres = -1.5
+            cnt = 0
 
         fig1, ax1 = plt.subplots(seg_len.shape[0], 1, sharex=True)
         fig1.suptitle(basename)
         fig2, ax2 = plt.subplots(seg_len.shape[0], 1, sharex=True)
         fig2.suptitle(basename)
+        fig3, ax3 = plt.subplots(seg_len.shape[0], 1, sharex=True)
+        fig3.suptitle(basename)
 
         bwr = plt.get_cmap('bwr')
         for i in range(seg_len.shape[0]):
@@ -75,28 +100,22 @@ if __name__ == '__main__':
             if show_plot:
                 ax2[i].plot(resampled_ta, resampled_seglen, c='k')
 
-            # speed_max = np.max(np.abs(speed[-1]))
-            # speed[-1] = speed[-1]
-
-            # Renormalizado
-            # ax[i].scatter(part_ta[speed[-1]>0], speed[-1][speed[-1]>0]/speed_max, c='b', s=1)
-            # ax[i].scatter(part_ta[speed[-1]<0], speed[-1][speed[-1]<0]/speed_max, c='r', s=1)
-
-            # Thresholded
-            # ax[i].scatter(part_ta[speed[-1]>up_thres], speed[-1][speed[-1]>up_thres], c='b', s=1)
-            # ax[i].scatter(part_ta[speed[-1]<low_thres], speed[-1][speed[-1]<low_thres], c='r', s=1)
-
             # Solo signo
+            rect_speed = np.copy(speed[-1])
+            rect_speed[(rect_speed > low_thres) & (rect_speed < up_thres)] = 0.
+            rect_speed = np.sign(rect_speed)
 
-            # ax[i].scatter(part_ta[speed[-1]>up_thres], [1] * part_ta[speed[-1]>up_thres].shape[0], c='b', s=1)
-            # ax[i].scatter(part_ta[speed[-1]<low_thres], [-1] * part_ta[speed[-1]<low_thres].shape[0], c='r', s=1)
+            if i==0:
+                first_rect_speed = np.copy(rect_speed)
 
-            ax1[i].imshow((-1 * speed[-1])[np.newaxis, :], cmap="bwr", vmin=-1.5, vmax=1.5, aspect="auto",
+
+            ax1[i].imshow((-1 * speed[-1])[np.newaxis, :], cmap="bwr", vmin=low_thres, vmax=up_thres, aspect="auto",
+                          extent=extent)
+            ax3[i].imshow((-1 * rect_speed)[np.newaxis, :], cmap="bwr", vmin=-1., vmax=1., aspect="auto",
                           extent=extent)
 
-            # [ax[i].axvline(x, c='b', lw=4) for x in part_ta[speed[-1]>up_thres]]
-            # [ax[i].axvline(x, c='r', lw=4) for x in part_ta[speed[-1]<low_thres]]
             ax1[i].grid()
+            ax3[i].grid()
 
         fig1.canvas.draw()
         fig2.canvas.draw()
@@ -104,33 +123,59 @@ if __name__ == '__main__':
             fig1.savefig("figs/" + basename + "speed_t.png", transparent=True, dpi=600)
             fig2.savefig("figs/" + basename + "seglen_t.png", transparent=True, dpi=600)
 
+        ax2[0].get_shared_x_axes().join(ax2[0], ax1[0])
+        ax2[0].get_shared_x_axes().join(ax2[0], ax3[0])
         smoothed_seg_len = np.array(smoothed_seg_len)
 
+        # print(smoothed_seg_len.shape)
         smoothed_total_len = smoothed_seg_len.sum(axis=0)
-        mins = spsig.find_peaks(-smoothed_total_len, -800, distance=int(2 * fps / filter_length))[0]
+        mins = spsig.find_peaks(-smoothed_total_len, np.mean(-smoothed_total_len), distance=int(4 * fps / filter_length))[0]
         min_times = resampled_ta[mins]
-        for ax in ax1:
-            for tm in min_times:
-                ax.axvline(tm, c='k', lw=2)
+
 
         speed = np.array(speed)
         speed_sign = np.sign(speed)
 
-        if show_plot:
-            fig3, ax3 = plt.subplots()
-            fig3.suptitle(basename)
-            ax3.plot(resampled_ta, smoothed_total_len)
-            ax3.scatter(resampled_ta[mins], smoothed_total_len[mins], c='r', marker='x')
+        cycle_start_idxs = [np.where((first_rect_speed>0) & (np.arange(first_rect_speed.shape[0])>=min_idx))[0][0] for min_idx in mins[:-1]]
+        # cycle_start_idxs = [np.where((speed[0]>0) & (np.arange(speed.shape[1])>=min_idx))[0][0] for min_idx in mins[:-1]]
+        cycle_start_times = resampled_ta[cycle_start_idxs]
 
+        for ax in ax1:
+            # for tm in min_times:
+            for tm in cycle_start_times:
+                ax.axvline(tm, c='g', lw=3)
+        for ax in ax3:
+            # for tm in min_times:
+            for tm in cycle_start_times:
+                ax.axvline(tm, c='g', lw=3)
+
+
+        if show_plot:
             fig4, ax4 = plt.subplots()
             fig4.suptitle(basename)
-            ax4.hist(speed.flatten(), bins=1000)
-            ax4.axvline(up_thres, color='k')
-            ax4.axvline(low_thres, color='k')
+            ax4.plot(resampled_ta, smoothed_total_len)
+            ax4.scatter(resampled_ta[mins], smoothed_total_len[mins], c='r', marker='x')
+            ax4.scatter(cycle_start_times, smoothed_total_len[cycle_start_idxs], c='g', marker='x')
+
+            fig5, ax5 = plt.subplots()
+            fig5.suptitle(basename)
+            ax5.hist(speed.flatten(), bins=50)
+            ax5.axvline(up_thres, color='k')
+            ax5.axvline(low_thres, color='k')
+            ax1[0].get_shared_x_axes().join(ax1[0], ax4)
+
             if save_fig: fig4.savefig("figs/" + basename + "_hist.png", transparent=True, dpi=600)
 
         diff_times = np.diff(min_times)
-        print(np.mean(diff_times), np.std(diff_times))
+        print("cycle mean: {}, cycle stdev: {}".format(np.mean(diff_times), np.std(diff_times)))
+        print(
+            "speed mean: {}, speed median: {}, speed stdev: {}".format(np.mean(speed), np.median(speed), np.std(speed)))
+
+        plt.close(fig2)
+        plt.close(fig1)
+        plt.close(fig5)
+        ax1[0].set_xlim((0, 20))
+        # n += 1
         # break
 
         # coloured_by_speed = []

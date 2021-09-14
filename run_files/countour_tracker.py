@@ -1,6 +1,8 @@
 import time
 import sys
 import time
+import os
+import glob
 
 sys.path.append(os.getcwd())
 from varname import nameof
@@ -9,12 +11,16 @@ from Utils.opencvUtils import *
 # TRACKING_COLOR = cv2.COLOR_BGR2GRAY
 TRACKING_COLOR = cv2.COLOR_BGR2HSV
 
-logf = open("contour_tracker_errors.log", "a")
-
+logf = open("contour_tracker_errors2.log", "a")
+logf.write("\n\nRunDate: {}\n".format(time.ctime()))
 if __name__ == "__main__":
     save_vid = False
     save_fig = False
     show_plot = True
+
+    lista_procesados = glob.glob('output1/tracked_data/*.npy')
+    lista_procesados = [getBasenameFromNpy(fn) for fn in lista_procesados]
+
 
     print(f"{nameof(save_vid)} is set to {save_vid}")
     print(f"{nameof(save_fig)} is set to {save_fig}")
@@ -25,11 +31,16 @@ if __name__ == "__main__":
     with open('marker_dict.json', 'r') as fp:
         video_params = json.load(fp)
 
-    for filename in list(video_params)[60:]:
+    for filename in [list(video_params)[31]]:
+    # for filename in list(video_params):
 
         print("Running")
 
         basename = os.path.splitext(filename)[0]
+        if basename in lista_procesados:
+            print("{} has already been processed, skipping".format(basename))
+            continue
+
         cap = cv2.VideoCapture(vid_path + filename)
 
         # Take first frame
@@ -37,12 +48,14 @@ if __name__ == "__main__":
 
         if not ret:
             print("Couldn't load %s, continuing with the next video" % basename)
+            cap.release()
             continue
         else:
             print("Processing file %s" % basename)
 
         if video_params[filename]['analyze'] == False:
-            print("Skipping file %s, 'analyze' is %b" % basename)
+            print("Skipping file %s, 'analyze' is False" % basename)
+            cap.release()
             continue
 
         size = (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
@@ -109,7 +122,7 @@ if __name__ == "__main__":
         # untracked_frames = []
 
         # cap = cv2.VideoCapture(vid_path + filename)
-        cap_result = cv2.VideoWriter("vids/" + basename + "_out.avi",
+        cap_result = cv2.VideoWriter("output1/videos/" + basename + "_out.avi",
                                      cv2.VideoWriter_fourcc(*'DIVX'),
                                      fps, size)
         try:
@@ -160,24 +173,24 @@ if __name__ == "__main__":
                 angles = getOrientation(p1, num=7)
 
                 mask = np.zeros_like(old_frame)
-                corrected_p1 = np.zeros_like(p1)
-                for i in range(p1.shape[0]):
-                    mask = np.zeros_like(tracking_frame)
-                    a, b = p1[i, 0, 0] - 1500 * np.sin(angles[i]), p1[i, 0, 1] + 1500 * np.cos(angles[i])
-                    a, b = int(a), int(b)
-                    c, d = p1[i, 0, 0] + 1500 * np.sin(angles[i]), p1[i, 0, 1] - 1500 * np.cos(angles[i])
-                    c, d = int(c), int(d)
-                    mask = cv2.line(mask, (a, b), (c, d), 255, 2)
-                    intersect = np.argwhere((ct_mask & mask) > 0)[(0, -1), :]
+                # corrected_p1 = np.zeros_like(p1)
+                # for i in range(p1.shape[0]):
+                #     mask = np.zeros_like(tracking_frame)
+                #     a, b = p1[i, 0, 0] - 1500 * np.sin(angles[i]), p1[i, 0, 1] + 1500 * np.cos(angles[i])
+                #     a, b = int(a), int(b)
+                #     c, d = p1[i, 0, 0] + 1500 * np.sin(angles[i]), p1[i, 0, 1] - 1500 * np.cos(angles[i])
+                #     c, d = int(c), int(d)
+                #     mask = cv2.line(mask, (a, b), (c, d), 255, 2)
+                #     intersect = np.argwhere((ct_mask & mask) > 0)[(0, -1), :]
 
-                    corrected_p1[i, 0, 0] = np.mean(intersect[:, 1])
-                    corrected_p1[i, 0, 1] = np.mean(intersect[:, 0])
-                    frame = cv2.circle(frame, (corrected_p1[i, 0, 0], corrected_p1[i, 0, 1]), 5, (0, 0, 255), 2)
+                    # corrected_p1[i, 0, 0] = np.mean(intersect[:, 1])
+                    # corrected_p1[i, 0, 1] = np.mean(intersect[:, 0])
+                    # frame = cv2.circle(frame, (corrected_p1[i, 0, 0], corrected_p1[i, 0, 1]), 5, (0, 0, 255), 2)
 
-                try:
-                    centered_trace = np.concatenate((centered_trace, corrected_p1), axis=1)
-                except NameError:
-                    centered_trace = np.copy(corrected_p1)
+                # try:
+                #     centered_trace = np.concatenate((centered_trace, corrected_p1), axis=1)
+                # except NameError:
+                #     centered_trace = np.copy(corrected_p1)
 
                 frame = cv2.drawContours(frame, [leech_ct], 0, (250, 0, 0), 3)
                 # draw the segments
@@ -210,17 +223,20 @@ if __name__ == "__main__":
             print("Frames processed")
             end = time.time()
             print("Took %f s per frame" % ((end - start) / total_frames))
-            # np.save('tracked_data/' + basename, trace)
-            np.save('tracked_data/' + basename + "_centered", centered_trace)
+            np.save('output1/tracked_data/' + basename, trace)
+            # np.save('tracked_data/' + basename + "_centered", centered_trace)
 
         except Exception as e:
             logf.write(
                 "Failed to process {0} in frame {1} (of {2} frames): {3}\n".format(basename, n, total_frames, str(e)))
-            np.save('tracked_data/' + basename + "_centered_FAILED", centered_trace)
+            np.save('output1/tracked_data/' + basename + "_FAILED", trace)
+            # np.save('tracked_data/' + basename + "_centered_FAILED", centered_trace)
         finally:
             cv2.destroyAllWindows()
             cap_result.release()
             cap.release()
-            del trace, centered_trace
+            del trace
+            # del trace, centered_trace
             pass
+    logf.write("-----\tDone running\t-----")
     logf.close()

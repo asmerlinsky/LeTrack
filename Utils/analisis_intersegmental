@@ -1,0 +1,86 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Sun Aug  8 21:40:32 2021
+
+@author: lidia
+"""
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Jul 13 16:03:39 2021
+
+@author: lidia
+"""
+
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+import itertools
+import json
+from scipy.ndimage import gaussian_filter1d
+from scipy.signal import argrelmax
+from scipy.signal import find_peaks
+
+with open('marker_dict.json', 'r') as fp:
+        json_dict = json.load(fp)
+
+video=np.load('output_latest/tracked_data/21-04-26_22.npy',encoding = "latin1") #Load file.
+video_s=np.load('output_latest/tracked_data/21-04-26_22.npy',encoding = "latin1").shape #Load file.
+video[:,2]
+plt.plot(video[:,0], video[:,1])
+plt.show()
+
+#LEECH 03 
+x=json_dict["21-04-28_02.AVI"]
+f21_04_28_02 = pd.read_csv("output_latest/tracked_data/21-04-28_02.csv", header=None)
+total_length=f21_04_28_02.sum(axis = 0) #sunar longitudes momento a momento
+
+f_21_04_28_02= np.transpose(f21_04_28_02)
+time=list(range(1, len(f_21_04_28_02)+1))
+timeT=[i * 0.033 for i in time]
+f_21_04_28_02.insert(loc=0, column="time", value=timeT)
+f_21_04_28_02.insert(loc=10, column="total length", value=total_length)
+
+file=f_21_04_28_02
+time=list(range(1, len(file)+1))
+timeT=[i * 0.033 for i in time]
+#end_column=len(file.columns)-1
+#mid_column=round(end_column/2)
+
+file_ff=gaussian_filter1d(file,sigma=10,axis=0)
+file_f=pd.DataFrame(file_ff)
+del(file_f[0])
+file_f.insert(loc=0, column="time", value=timeT)
+
+lengths={} #calcular en cuanto aumenta con cada segmento
+# for i in range(1,9):
+#    lengths[0]=file_f[1]
+#    lengths[i]=lengths[i-1]+file_f[i+1]
+
+lengths[0]=file_f[1]
+for i in range(1,9):
+    print(i-1, i+1)
+    lengths[i]=lengths[i-1]+file_f[i+1]
+
+
+Lengths = pd.DataFrame.from_dict(lengths)
+
+
+relative_lengths={} #calcular en cuanto aumenta con cada segmento
+for i in range(0,9):     
+   relative_lengths[i]=Lengths[i]/total_length
+   
+
+
+#ploteo de todos los segmentos y del total
+plt.figure(1)
+ax1 = plt.subplot(311)
+plt.plot(file_f["time"], total_length)
+for i in range(0,9):     
+     ax2 = plt.subplot(312, sharex=ax1)
+     plt.plot(file_f["time"], lengths[i])
+     plt.legend(loc=5, bbox_to_anchor=(1, 1))
+     ax3=plt.subplot(313, sharex=ax1)
+     plt.plot(file_f["time"], relative_lengths[i])

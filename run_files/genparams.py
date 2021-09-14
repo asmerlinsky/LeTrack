@@ -3,7 +3,7 @@ import sys
 from Utils.opencvUtils import *
 
 TRACKING_COLOR = cv2.COLOR_BGR2HSV
-gen_markers = True
+gen_markers = False
 preprocessing = True
 frame_processing = True
 update_dict = False
@@ -39,9 +39,9 @@ if __name__ == "__main__":
     vid_path = "../NeuroData/videos_pruebas_beh/"
     # vid_path = "vids/"
 
-    video_list = sorted(glob.glob(vid_path + "21-04-30*.AVI"))
+    # video_list = sorted(glob.glob(vid_path + "21-04-26_26.AVI"))
 
-    filename = os.path.basename(video_list[21])
+    filename = os.path.basename('DSC_8274.MOV')
     print(filename)
     if any([filename == fn for fn in list(video_params)]):
         print("El archivo ya esta subido a 'video_params'")
@@ -113,8 +113,8 @@ if __name__ == "__main__":
                             contour_up_thres=contour_up_thres,
                             )
         # Parameters for lucas kanade optical flow
-        lk_params = dict(winSize=(8, 8),
-                         maxLevel=1,
+        lk_params = dict(winSize=(30, 30),
+                         maxLevel=3,
                          criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
 
     else:
@@ -231,8 +231,8 @@ if __name__ == "__main__":
             frame = cv2.drawContours(frame, [leech_ct], 0, (250, 0, 0), 3)
             # draw the segments
             for i, (next, prev) in enumerate(zip(good_new[1:], good_new[:-1])):
-                a, b = prev.ravel()
-                c, d = next.ravel()
+                a, b = prev.ravel().astype(int)
+                c, d = next.ravel().astype(int)
                 frame = cv2.line(frame, (a, b), (c, d), color[i].tolist(), 2)
                 frame = cv2.circle(frame, (a, b), 5, color[i].tolist(), -1)
             frame = cv2.circle(frame, (good_new[-1, 0], good_new[-1, 1]), 5, color[i].tolist(), -1)
@@ -258,7 +258,7 @@ if __name__ == "__main__":
 
         print("read %i out of %i frames" % (frame_no, total_frames))
 
-        comments = """Esta bien."""
+        comments = """Es una prueba del nuevo color"""
     # markers = video_params[filename]['markers']
     #
     if update_dict:
@@ -266,8 +266,8 @@ if __name__ == "__main__":
                           lk_params=lk_params,
                           thres_params=thres_params,
                           comments=comments,
-                          analyze=True,
-                          leech=5,
+                          analyze=False,
+                          leech=7,
                           )
         video_params[filename] = video_dict
         print("Updated Dict")

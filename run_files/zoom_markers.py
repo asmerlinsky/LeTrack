@@ -5,7 +5,7 @@ import cv2
 import numpy as np
 
 if __name__ == '__main__':
-
+    base_path = 'output_nikon/'
     data_path = "tracked_data/"
 
     with open('marker_dict.json', 'r') as fp:
@@ -13,14 +13,14 @@ if __name__ == '__main__':
 
     file_list = list(marker_dict)
 
-    basename = os.path.splitext(os.path.basename(file_list[6]))[0]
-    filename = data_path + basename + '_centered.npy'
+    basename = os.path.splitext(os.path.basename(file_list[-1]))[0]
+    filename = base_path + data_path + basename + '.npy'
 
     print("Running %s" % filename)
 
     trace = np.load(filename)
 
-    cap = cv2.VideoCapture('vids/%s_out.avi' % basename)
+    cap = cv2.VideoCapture(base_path + 'videos/%s_out.avi' % basename)
 
     size = (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
     fps = cap.get(cv2.CAP_PROP_FPS)
@@ -28,7 +28,7 @@ if __name__ == '__main__':
     out_size = 150
     cap_list_out = []
     for i in range(trace.shape[0]):
-        cap_list_out.append(cv2.VideoWriter("vids/zoomed/%s_%i.avi" % (basename, i),
+        cap_list_out.append(cv2.VideoWriter(base_path + "videos/zoomed1/%s_%i.avi" % (basename, i),
                                             cv2.VideoWriter_fourcc(*'DIVX'),
                                             fps, (out_size, out_size))
                             )

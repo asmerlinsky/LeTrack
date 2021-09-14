@@ -19,9 +19,9 @@ print(f"{nameof(update_json)} is set to {update_json}")
 
 vid_path = "../NeuroData/videos_pruebas_beh/"
 
-video_list = glob.glob(vid_path + "*.MOV")
+video_list = glob.glob(vid_path + "*.AVI")
 
-filename = os.path.basename(video_list[3])
+filename = os.path.basename(video_list[30])
 
 with open('vids/marker_dict.json', 'r') as fp:
     marker_dict = json.load(fp)

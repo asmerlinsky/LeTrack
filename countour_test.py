@@ -9,11 +9,12 @@ filename = 'test.mpg'
 # filename = 'blackfly_test.avi'
 # filename = 'casio.MOV'
 # filename = 'CIMG4792.mkv'
+filename = 'CIMG4777.MOV'
 # filename = 'casio_closeup.MOV'
 
 print("Running")
 
-cap = cv2.VideoCapture('vids/' + filename)
+cap = cv2.VideoCapture(filename)
 
 # Take first frame and find corners in it
 ret, old_frame = cap.read()
