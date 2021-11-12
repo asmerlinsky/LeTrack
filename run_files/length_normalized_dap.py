@@ -20,9 +20,9 @@ if __name__ == '__main__':
     # TRACKING_COLOR = cv2.COLOR_BGR2GRAY
     TRACKING_COLOR = cv2.COLOR_BGR2HSV
     has_edges = True
-    num_bins = 10
+    num_bins = 20
     seg_start = 0
-    num_segments = 8
+    num_segments = 5
     if num_segments != 'all':
         mid_segment = np.floor(num_segments/2).astype(int)
     filter_length = 3
@@ -119,16 +119,18 @@ if __name__ == '__main__':
         speed = np.array(speed)
 
         cycle_idxs = []
+        val = 0
         for min_idx in mins:
             try:
-                val = np.where((speed[1] > speed_thres) & (np.arange(speed.shape[1]) >= min_idx))[0][0]
+                # val = np.where((speed[1] > speed_thres) & (np.arange(speed.shape[1]) >= min_idx))[0][0]
+                val = np.where((speed[0] > speed_thres) & (np.arange(speed.shape[1]) >= min_idx) & (np.arange(speed.shape[1]) > val) )[0][0]
                 cycle_idxs.append(val)
             except IndexError:
                 break
 
 
         cycle_idxs = np.array(cycle_idxs)
-
+        print(cycle_idxs)
         cycle_times = resampled_ta[cycle_idxs]
         cycle_start_idxs = cycle_idxs[:-1]
         cycle_end_idxs = cycle_idxs[1:]
@@ -151,7 +153,9 @@ if __name__ == '__main__':
         cycle_end_times = resampled_ta[cycle_end_idxs]
         ax4.scatter(cycle_start_times, smoothed_total_len[cycle_start_idxs], c='g', marker='x')
         ax4.scatter(cycle_end_times, smoothed_total_len[cycle_end_idxs], c='b', marker='x')
+
         err=False
+
         for i in range(cycle_start_idxs.shape[0]):
             idx_start = cycle_start_idxs[i]
             idx_end = cycle_end_idxs[i]
@@ -162,6 +166,7 @@ if __name__ == '__main__':
             length_matrix = resample(smoothed_seg_len[:, idx_start:idx_end], num=num_bins, axis=1)
 
 
+            length_matrix -= length_matrix.min(axis=1).reshape(-1, 1)
             length_matrix /= length_matrix.max(axis=1).reshape(-1, 1)
 
 
@@ -189,69 +194,5 @@ if __name__ == '__main__':
 
     plt.close('all')
 
-    filename = "{}crawling_length_normalized_{}segments_{}bins_vidname_cycleno".format(data_path, num_segments, num_bins)
+    filename = "{}crawling_length_normalized_{}segments_{}bins_vidname_cycleno_v2".format(data_path, num_segments, num_bins)
     cvU.pickleDfArrayStore(filename, df, processed_matrix=binned_cycle_lengths, globs=globals())
-    run_videos = ['21-04-26_28', '21-04-28_09', '21-04-26_08']
-    part_df = df.iloc[:,:10]
-
-    part_df['leech_no'] = df.leech_no
-    part_df = part_df[[vn in run_videos for vn in df.video_name]]
-    sns.pairplot(part_df, hue='leech_no', diag_kind='hist', diag_kws = {'bins': 30})
-    loaded = cvU.pickleDfArrayLoad(filename)
-
-
-
-    # for vn in run_videos:
-    #     for idx in df.loc[(df.video_name==vn) & (df.cycle_no<5)].index:
-    #
-    #         cycle = pca.inverse_transform(tf_bcs[idx]).reshape(num_segments, num_bins)
-    #
-    #
-    #         fig, ax = plt.subplots(cycle.shape[0])
-    #         fig.suptitle("file {}\n cycle {}".format(vn, df.cycle_no[idx]))
-    #
-    #         for j in range(cycle.shape[0]):
-    #             ax[j].imshow(cycle[j][np.newaxis, :], cmap="bwr", vmin=-1., vmax=1., aspect="auto")
-    #
-
-    mixture = GaussianMixture(n_components=4, n_init=10, max_iter=1000)
-    pred = mixture.fit_predict(df.iloc[:,:n_comps].values)
-    df['pred'] = pred
-    nc = 8
-    sns.pairplot(df, vars=['col_'+str(i) for i in range(nc)],
-                 hue='leech_no', palette=sns.color_palette()[:np.unique(df.leech_no).shape[0]])
-    sns.pairplot(df, vars=['col_'+str(i) for i in range(nc)],
-                 hue='cycle_reset')
-    sns.pairplot(df, vars=['col_'+str(i) for i in range(nc)],
-                 hue='pred', palette=sns.color_palette()[:np.unique(df.pred).shape[0]])
-    sns.pairplot(df, vars=['col_'+str(i) for i in range(nc)], diag_kind='hist', diag_kws = {'bins':50})
-
-
-    two_clust_df = df.loc[[row in [0, 1] for row in df.pred]].copy()
-    unique_leech_df = two_clust_df[two_clust_df.leech_no==2].copy()
-    unique_leech_df.drop(columns='leech_no', inplace=True)
-    sns.pairplot(unique_leech_df, vars=['col_'+str(i) for i in range(8)],
-                     hue='pred', palette=sns.color_palette()[:np.unique(unique_leech_df.pred).shape[0]], diag_kind='hist')
-
-
-    sns.pairplot(two_clust_df, vars=['col_'+str(i) for i in range(8)],
-                     hue='pred', palette=sns.color_palette()[:np.unique(two_clust_df.pred).shape[0]], diag_kind='hist')
-
-    for i in range(mixture.means_.shape[0]):
-
-        cycle = pca.inverse_transform(mixture.means_[i]).reshape(num_segments, num_bins)
-        # cycle = binned_cycle_speeds[i]
-        # cycle = np.round(cycle)
-        fig, ax = plt.subplots(cycle.shape[0])
-        fig.suptitle("center {}".format(i))
-
-        for j in range(cycle.shape[0]):
-            ax[j].plot(cycle[j], c='k')
-
-
-    mat = binned_lengths[152]
-    cvU.plotBinnedLengths(mat)
-
-    for row in df[df.video_name=='21-04-28_04'].index:
-        mat = binned_cycle_lengths[row]
-        cvU.plotBinnedLengths(mat)

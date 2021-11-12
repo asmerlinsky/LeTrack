@@ -140,10 +140,32 @@ def pickleDfArrayLoad(filename):
     return store
 
 def checkCyclesReset(binned_cycle_lengths, start_segment='mid',min_stretching_segs=3, min_shortening_segs=2):
+    """
+    Checks whether the cycle has some type of posterior to anterior
+    reset of the body at the end of it.
+    Parameters
+    ---------
+    binned_cycle_lengths ndarray:
+        Array of shape (number of cycles, number of segments, number of bins) where each row has the information for each individual cycle
+        where the second axis corresponds to each segment and the last axis is the time.
+    start_segment int, str:
+        Which segment will be the first to start looking for stretching. Those behind (the segments closer to the tail)
+         it will be searched for stretching, while those ahead(the segments closer to the head) will be searched for
+         shortening. if `mid` the middle segment will be selected.
+    min_stretching_segs int:
+        The minimum number of segments where stretching after proper movement must be found for the cycle to be
+        considered a reset one.
+    min_shortening_seg int:
+        The minimum number of segments where shortening after proper movement must be found for the cycle to be
+        considered a reset one.
 
+    Returns
+    ---------
+    reseting cycles ndarray:
+        Boolean array of shape (number of cycles,) where a 1 indicates the cycle was found to be a reseting one and
+        a 0 indicates it wasn't.
+    """
     num_cycles = binned_cycle_lengths.shape[0]
-
-
 
     reseting_cycles = np.zeros(num_cycles)
 
@@ -154,13 +176,19 @@ def checkCyclesReset(binned_cycle_lengths, start_segment='mid',min_stretching_se
         if start_segment == 'mid':
             start_segment = int(np.floor(num_segments/2))
 
-        segment_speeds = np.diff(length_matrix, axis=1)
+        segment_speeds = np.diff(length_matrix, axis=1) #gets speeds
+
         speed_mad = median_abs_deviation(segment_speeds, axis=None)
+
+        # finds times and segments that are shortening
         shortening_idxs = np.where(segment_speeds < 0)
         fast_shortening_idxs = np.where(segment_speeds < -2*speed_mad)
+
+        # finds times and segments that are stretching
         stretching_idxs = np.where(segment_speeds > 0)
         over_std_streching_idxs = np.where(segment_speeds > speed_mad)
         over_std_shortening_idxs = np.where(segment_speeds < -speed_mad)
+
         after_stretch = np.zeros(num_segments-start_segment, dtype=bool)
         after_short = np.zeros(start_segment, dtype=bool)
 
@@ -176,18 +204,21 @@ def checkCyclesReset(binned_cycle_lengths, start_segment='mid',min_stretching_se
 
         for seg in range(start_segment):
             try:
+                # gets the times where anterior segments are shortening
                 temp_idxs =over_std_shortening_idxs[1][over_std_shortening_idxs[0]==seg]
             except IndexError as e:
                 print("Index error in row {0}".format(i))
                 raise e
-            if any([td > last_shortening for td in temp_idxs]):
+            if any([td > last_shortening for td in temp_idxs]): # find if the times ares after the last shortening
                 after_short[j] = 1
             j += 1
 
         j=0
         for seg in range(start_segment, num_segments):
             try:
+                #finds the first stretching for each segment
                 first_strech = stretching_idxs[1][stretching_idxs[0] == seg][0]
+                # finds the first shortening after the stretching
                 first_short_after_strech = \
                     shortening_idxs[1][(shortening_idxs[1] > first_strech) & (shortening_idxs[0] == seg)][0]
 
@@ -196,8 +227,11 @@ def checkCyclesReset(binned_cycle_lengths, start_segment='mid',min_stretching_se
                 print("Index error in row {0}".format(i))
                 raise e
             if any([td > first_short_after_strech for td in temp_idxs]):
+                #finds if theres stretching after the previuos shortening
                 after_stretch[j] = 1
             j += 1
+
+        # the min stretching and shortening conditions are met, then the cycle y labeled with a 1
         if sum(after_stretch) >= min_stretching_segs and sum(after_short) >= min_shortening_segs:
             reseting_cycles[i] = 1
         i += 1
