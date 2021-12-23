@@ -167,11 +167,11 @@ def checkCyclesReset(binned_cycle_lengths, start_segment='mid',min_stretching_se
     """
     num_cycles = binned_cycle_lengths.shape[0]
 
-    reseting_cycles = np.zeros(num_cycles)
-
+    reseting_cycles = np.zeros(num_cycles, dtype=bool)
+    errored_rows = []
     i = 0
     for length_matrix in binned_cycle_lengths:
-
+        err = False
         num_segments = length_matrix.shape[0]
         if start_segment == 'mid':
             start_segment = int(np.floor(num_segments/2))
@@ -205,15 +205,17 @@ def checkCyclesReset(binned_cycle_lengths, start_segment='mid',min_stretching_se
         for seg in range(start_segment):
             try:
                 # gets the times where anterior segments are shortening
-                temp_idxs =over_std_shortening_idxs[1][over_std_shortening_idxs[0]==seg]
+                temp_idxs = over_std_shortening_idxs[1][over_std_shortening_idxs[0]==seg]
             except IndexError as e:
-                print("Index error in row {0}".format(i))
-                raise e
+                errored_rows.append(i)
+                i += 1
+                err = True
+                break
             if any([td > last_shortening for td in temp_idxs]): # find if the times ares after the last shortening
                 after_short[j] = 1
             j += 1
-
-        j=0
+        if err: continue
+        j = 0
         for seg in range(start_segment, num_segments):
             try:
                 #finds the first stretching for each segment
@@ -224,18 +226,21 @@ def checkCyclesReset(binned_cycle_lengths, start_segment='mid',min_stretching_se
 
                 temp_idxs = over_std_streching_idxs[1][over_std_streching_idxs[0] == seg]
             except IndexError as e:
-                print("Index error in row {0}".format(i))
-                raise e
+                errored_rows.append(i)
+                err = True
+                i += 1
+                break
             if any([td > first_short_after_strech for td in temp_idxs]):
                 #finds if theres stretching after the previuos shortening
                 after_stretch[j] = 1
             j += 1
+        if err: continue
 
         # the min stretching and shortening conditions are met, then the cycle y labeled with a 1
         if sum(after_stretch) >= min_stretching_segs and sum(after_short) >= min_shortening_segs:
             reseting_cycles[i] = 1
         i += 1
-    return reseting_cycles
+    return reseting_cycles, np.array(errored_rows, dtype=int)
 
 def  plotBinnedLengths(cycle_length, num_segments=None, num_bins=None,zscore_speed=False):
     if num_segments is not None:
@@ -243,6 +248,9 @@ def  plotBinnedLengths(cycle_length, num_segments=None, num_bins=None,zscore_spe
     speeds = np.diff(cycle_length, axis=1)
     if zscore_speed:
         speeds = zscore(speeds,axis=None)
+        speeds[(speeds<.5) & (speeds>-.5)] = 0.
+        speeds[(speeds<.5) & (speeds>-.5)] = 0.
+
 
     fig, ax = plt.subplots(cycle_length.shape[0], 2)
     for j in range(cycle_length.shape[0]):
@@ -302,18 +310,18 @@ def getSmoothingAndSpeedFromSegLen(segment_length, filter_length):
     smoothed_seg_len = np.array(smoothed_seg_len)
     return smoothed_seg_len, speed
 
-def getLengthMins(total_length, fps, filter_length):
+def getLengthMins(total_length, fps, filter_length, min_distance=2):
 
     avg_len = np.mean(total_length)
 
-    mins = spsig.find_peaks(-total_length, -avg_len, distance=int(4 * fps / filter_length))[0]
-    maxs = spsig.find_peaks(total_length, avg_len, distance=int(4 * fps / filter_length))[0]
+    mins = spsig.find_peaks(-total_length, -avg_len, distance=int(min_distance * fps / filter_length))[0]
+    maxs = spsig.find_peaks(total_length, avg_len, distance=int(min_distance * fps / filter_length))[0]
 
     normalization_length = np.median(total_length[maxs])
 
     ampl = np.mean(total_length[maxs]) - np.mean(total_length[mins])
 
-    true_mins = spsig.find_peaks(-total_length, -(avg_len - (ampl / 8)), distance=int(4 * fps / filter_length))[0]
+    true_mins = spsig.find_peaks(-total_length, -(avg_len - (ampl / 8)), distance=int(min_distance * fps / filter_length))[0]
     return true_mins
 
 def getCycleIndexes(total_length, cheking_speed, speed_threshold, fps, filter_length):

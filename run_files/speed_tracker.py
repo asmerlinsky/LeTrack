@@ -1,6 +1,6 @@
 import numpy as np
 from varname import nameof
-
+import glob
 from Utils.opencvUtils import *
 
 # TRACKING_COLOR = cv2.COLOR_BGR2GRAY
@@ -9,14 +9,15 @@ TRACKING_COLOR = cv2.COLOR_BGR2HSV
 if __name__ == "__main__":
     save_vid = True
     save_fig = False
-    save_npy = False
+    save_npy = True
     show_plot = False
+
     base_path = 'output_latest/'
-    video_path = 'videos_single_color/'
+    video_path = 'videos/'
     print(f"{nameof(save_vid)} is set to {save_vid}")
     print(f"{nameof(save_fig)} is set to {save_fig}")
     print(f"{nameof(show_plot)} is set to {show_plot}")
-
+    already_processed = [st.replace('\\', '/') for st in glob.glob('{}{}*'.format(base_path, video_path))]
     vid_path = "../NeuroData/videos_pruebas_beh/"
 
     with open('marker_dict.json', 'r') as fp:
@@ -25,11 +26,16 @@ if __name__ == "__main__":
     for filename in list(video_params):
 
         print("Running")
-
-        if not video_params[filename]['analyze']:
+        basename = os.path.splitext(filename)[0]
+        if "{}{}{}_out.avi".format(base_path, video_path, basename) in already_processed:
+            print('{} is processed'.format(filename))
             continue
 
-        basename = os.path.splitext(filename)[0]
+        if not video_params[filename]['analyze']:
+            print('Analyze is false for {}'.format(filename))
+            continue
+
+
         cap = cv2.VideoCapture(vid_path + filename)
 
         # Take first frame
@@ -51,8 +57,8 @@ if __name__ == "__main__":
 
         p0 = np.array(video_params[filename]['markers'], dtype=np.float32)
 
-        # color = np.random.randint(0, 255, (p0.shape[0], 3))
-        color = np.ones((p0.shape[0], 3)) * 153
+        color = np.random.randint(0, 255, (p0.shape[0], 3))
+        # color = np.ones((p0.shape[0], 3)) * 153
 
         p0 = p0.reshape((p0.shape[0], 1, p0.shape[1]))
         # Create some random colors

@@ -3,12 +3,12 @@ import sys
 from Utils.opencvUtils import *
 
 TRACKING_COLOR = cv2.COLOR_BGR2HSV
-gen_markers = False
+gen_markers = True
 preprocessing = True
 frame_processing = True
-update_dict = False
-update_json = False
-
+update_dict = True
+update_json = True
+elem = 25
 """
 #para renombrar
 vid_path = "../NeuroData/videos_pruebas_beh/"
@@ -39,16 +39,18 @@ if __name__ == "__main__":
     vid_path = "../NeuroData/videos_pruebas_beh/"
     # vid_path = "vids/"
 
-    # video_list = sorted(glob.glob(vid_path + "21-04-26_26.AVI"))
-
-    filename = os.path.basename('DSC_8274.MOV')
-    print(filename)
-    if any([filename == fn for fn in list(video_params)]):
+    video_list = sorted(glob.glob(vid_path + "25-11-21*"))
+    video_list = [vl.replace('\\','/') for vl in video_list]
+    # filename = os.path.basename('DSC_8274.MOV')
+    filename = video_list[elem]
+    basename = os.path.basename(filename)
+    print(basename)
+    if any([basename == fn for fn in list(video_params)]):
         print("El archivo ya esta subido a 'video_params'")
 
-    # filename = list(video_params)[7]
+
     try:
-        fn_dict = video_params[filename]
+        fn_dict = video_params[basename]
         try:
             print(fn_dict['comments'])
         except KeyError:
@@ -61,14 +63,13 @@ if __name__ == "__main__":
 
     # parametro para buscar los markers
 
-    basename = os.path.splitext(filename)[0]
 
-    cap = cv2.VideoCapture(vid_path + filename)
+
+    cap = cv2.VideoCapture(vid_path + basename)
     # cap = cv2.VideoCapture("vids/test.mpg")
 
     # Take first frame and find corners in it
     ret, old_frame = cap.read()
-
     size = (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
     total_frames = cap.get(cv2.CAP_PROP_FRAME_COUNT)
     fps = cap.get(cv2.CAP_PROP_FPS)
@@ -92,20 +93,23 @@ if __name__ == "__main__":
     if gen_markers:
         mg = MarkerGenerator(fig, ax)
 
+
+
+
     if preprocessing:
         if not markers:
-            p0 = np.array(video_params[filename]['markers'], dtype=np.float32)
+            p0 = np.array(video_params[basename]['markers'], dtype=np.float32)
         else:
             p0 = np.array(markers, dtype=np.float32)
 
         print("Usando los parametros del script")
 
         low_thres_marker = (30, 40, 100)
-        up_thres_marker = (70, 230, 200)
+        up_thres_marker = (80, 230, 200)
 
         # parametro para buscar el background
         contour_low_thres = (0, 0, 60)
-        contour_up_thres = (255, 100, 255)
+        contour_up_thres = (255, 255, 255)
 
         thres_params = dict(low_thres=low_thres_marker,
                             up_thres=up_thres_marker,
@@ -113,29 +117,29 @@ if __name__ == "__main__":
                             contour_up_thres=contour_up_thres,
                             )
         # Parameters for lucas kanade optical flow
-        lk_params = dict(winSize=(30, 30),
+        lk_params = dict(winSize=(20, 20),
                          maxLevel=3,
                          criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
 
     else:
         print("Usando parametros que están en 'video_params'")
         try:
-            p0 = np.array(video_params[filename]['markers'], dtype=np.float32)
+            p0 = np.array(video_params[basename]['markers'], dtype=np.float32)
         except KeyError:
             print("No hay markers para este archivo en 'video_params'")
             raise
 
         try:
-            thres_params = {key: tuple(item) for key, item in video_params[filename]['thres_params'].items()}
+            thres_params = {key: tuple(item) for key, item in video_params[basename]['thres_params'].items()}
         except KeyError:
             print("No hay parámetros de threshold para este archivo")
             raise
 
         try:
 
-            lk_params = dict(winSize=tuple(video_params[filename]['lk_params']['winSize']),
+            lk_params = dict(winSize=tuple(video_params[basename]['lk_params']['winSize']),
                              maxLevel=3,
-                             criteria=tuple(video_params[filename]['lk_params']['criteria']))
+                             criteria=tuple(video_params[basename]['lk_params']['criteria']))
         except:
             print("No hay parámetros para el algo lk")
             raise
@@ -258,18 +262,19 @@ if __name__ == "__main__":
 
         print("read %i out of %i frames" % (frame_no, total_frames))
 
-        comments = """Es una prueba del nuevo color"""
+
     # markers = video_params[filename]['markers']
     #
+    comments = """Uso la casio. va bien."""
     if update_dict:
         video_dict = dict(markers=markers,
                           lk_params=lk_params,
                           thres_params=thres_params,
                           comments=comments,
-                          analyze=False,
-                          leech=7,
+                          analyze=True,
+                          leech='11',
                           )
-        video_params[filename] = video_dict
+        video_params[basename] = video_dict
         print("Updated Dict")
     else:
         print("Not updating dict")
